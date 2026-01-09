@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Work Timer - Track Your Productivity</title>
+    
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- External Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="shortcut icon" href="logo copy.png" type="image/x-icon">
+</head>
+<body>
+    <!-- Auth Container -->
+    <div class="auth-container" id="authContainer">
+        <div style="text-align: center; margin-bottom: 25px;">
+            <h2>⏱️ Remote Work Timer</h2>
+            <p style="color: #666; line-height: 1.6; margin-top: 10px;">
+                Track your remote work hours, stay accountable, and boost your productivity. 
+                Perfect for freelancers, remote workers, and anyone who needs accurate time tracking.
+            </p>
+        </div>
+        <div id="loginForm">
+            <form id="loginFormElement" onsubmit="login(event)">
+                <input type="text" id="loginUsername" class="auth-input" placeholder="Username" name="username" autocomplete="username">
+                <div class="password-container">
+                    <input type="password" id="loginPassword" placeholder="Password" name="password" autocomplete="current-password">
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('loginPassword', this)">👁️</button>
+                </div>
+                <div class="remember-me">
+                    <input type="checkbox" id="rememberMe" checked>
+                    <label for="rememberMe">Remember me</label>
+                </div>
+                <div class="forgot-password">
+                    <a onclick="showForgotPassword()">Forgot password?</a>
+                </div>
+                <button type="submit" class="auth-btn">Login</button>
+            </form>
+            <div class="auth-toggle">
+                Don't have an account? <a onclick="showSignup()">Sign up</a>
+            </div>
+        </div>
+        <div id="signupForm" style="display: none;">
+            <form id="signupFormElement" onsubmit="signup(event)">
+                <input type="text" id="signupUsername" class="auth-input" placeholder="Username" name="username" autocomplete="username">
+                <div class="password-container">
+                    <input type="password" id="signupPassword" placeholder="Password (min 6 characters)" name="password" autocomplete="new-password">
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('signupPassword', this)">👁️</button>
+                </div>
+                <button type="submit" class="auth-btn">Sign Up</button>
+            </form>
+            <div class="auth-toggle">
+                Already have an account? <a onclick="showLogin()">Login</a>
+            </div>
+        </div>
+        <div id="forgotPasswordForm" style="display: none;">
+            <input type="text" id="forgotUsername" class="auth-input" placeholder="Enter your username">
+            <div class="password-container">
+                <input type="password" id="newPassword" placeholder="Enter new password (min 6 characters)">
+                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newPassword', this)">👁️</button>
+            </div>
+            <div class="password-container">
+                <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmPassword', this)">👁️</button>
+            </div>
+            <button class="auth-btn" onclick="resetPassword()">Reset Password</button>
+            <div class="auth-toggle">
+                <a onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+        <div class="error-message" id="authError"></div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="container" id="appContainer" style="display: none;">
+        <!-- Welcome Banner -->
+        <div style="background: linear-gradient(135deg, #A3A380 0%, #D6CE93 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+            <h2 style="font-size: 1.8em; margin-bottom: 10px;">⏱️ Remote Work Tracker</h2>
+            <p style="font-size: 1.05em; opacity: 0.95; line-height: 1.6; margin: 0;">
+                Track your remote work hours with precision. Stay accountable to your employer, analyze your productivity patterns, and maintain accurate time logs. Perfect for freelancers, remote workers, and anyone who needs to document their working hours professionally.
+            </p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card">
+                <h3>Today's Total</h3>
+                <div class="value" id="todayTotal">0h 0m</div>
+            </div>
+            <div class="summary-card green">
+                <h3>This Week</h3>
+                <div class="value" id="weekTotal">0h 0m</div>
+            </div>
+            <div class="summary-card orange">
+                <h3>This Month</h3>
+                <div class="value" id="monthTotal">0h 0m</div>
+            </div>
+            <div class="summary-card blue">
+                <h3>Total Entries</h3>
+                <div class="value" id="totalEntries">0</div>
+            </div>
+        </div>
+
+        <!-- Timer Section -->
+        <div class="timer-input-section">
+            <input type="text" id="taskInput" class="task-input" placeholder="What are you working on?">
+            <button class="pause-btn" id="pauseBtn" onclick="togglePause()" style="display: none;">
+                <span id="pauseIcon">⏸</span>
+                <span id="pauseText">Pause</span>
+            </button>
+            <button class="toggle-btn" id="toggleBtn" onclick="toggleTimer()">
+                <span id="btnIcon">▶</span>
+                <span id="btnText">Start</span>
+            </button>
+        </div>
+
+        <div class="current-timer" id="currentTimer" style="display: none;">
+            <div class="current-task">
+                <div class="current-task-name" id="currentTaskName"></div>
+                <div class="current-task-time" id="currentTaskTime">00:00:00</div>
+            </div>
+            <div class="timer-milestone" id="timerMilestone"></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('entries')">📋 Entries</button>
+            <button class="tab" onclick="switchTab('stats')">📊 Statistics</button>
+        </div>
+
+        <!-- Entries Tab -->
+        <div class="tab-content active" id="entriesTab">
+            <!-- Filters Section -->
+            <div class="filters-section">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Search Tasks</label>
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Search by task name..." oninput="applyFilters()">
+                            <span class="search-icon">🔍</span>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>From Date</label>
+                        <input type="date" id="fromDate" onchange="applyFilters()">
+                    </div>
+                    <div class="filter-group">
+                        <label>To Date</label>
+                        <input type="date" id="toDate" onchange="applyFilters()">
+                    </div>
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn" onclick="setQuickFilter('today')">Today</button>
+                    <button class="filter-btn" onclick="setQuickFilter('week')">This Week</button>
+                    <button class="filter-btn" onclick="setQuickFilter('month')">This Month</button>
+                    <button class="filter-btn secondary" onclick="clearFilters()">Clear All</button>
+                </div>
+            </div>
+
+            <!-- Sessions List -->
+            <div class="sessions">
+                <h2>📋 Time Entries</h2>
+                <div class="sync-status" id="syncStatus"></div>
+                <div id="sessionsList">
+                    <div class="empty-state">No entries yet. Start tracking your time!</div>
+                </div>
+                
+                <div class="total" id="totalTime">
+                    Total: 0h 0m
+                </div>
+
+                <button class="export-btn" onclick="exportEntries()">📥 Export to Text</button>
+                <button class="export-csv-btn" onclick="exportToCSV()">📊 Export to CSV</button>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div class="tab-content" id="statsTab">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <h4>Average Daily Hours</h4>
+                    <div class="stat-value" id="avgDaily">0.0h</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Most Productive Day</h4>
+                    <div class="stat-value" id="bestDay">-</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Longest Session</h4>
+                    <div class="stat-value" id="longestSession">0h 0m</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Total All Time</h4>
+                    <div class="stat-value" id="totalAllTime">0h 0m</div>
+                </div>
+            </div>
+
+            <div class="chart-container" style="margin-top: 30px;">
+                <div class="chart-title">📈 Weekly Hours Trend</div>
+                <canvas id="weeklyChart" style="max-height: 300px;"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 Daily Distribution (Last 7 Days)</div>
+                <canvas id="dailyChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Footer with User Info -->
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+            <div class="header">
+                <div style="color: #666; font-size: 0.95em;">
+                    <strong>Logged in as:</strong> <span class="user-email" id="userEmail"></span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h3>Edit Time Entry</h3>
+            <div class="form-group">
+                <label>Task Description</label>
+                <input type="text" id="editTask" placeholder="Task name">
+            </div>
+            <div class="form-group">
+                <label>Start Time</label>
+                <input type="datetime-local" id="editStart">
+            </div>
+            <div class="form-group">
+                <label>End Time</label>
+                <input type="datetime-local" id="editEnd">
+            </div>
+            <div class="modal-actions">
+                <button class="save-btn" onclick="saveEdit()">Save</button>
+                <button class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="script-firebase.js"></script>
+</body>
+</html>
